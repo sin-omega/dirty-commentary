@@ -10,8 +10,8 @@
 
 export const dictionary = {
   brand: {
-    name: 'Dirty Commentary',
-    eyebrow: 'Beka z clean girl',
+    name: 'wpadka commentary',
+    eyebrow: 'nikt nie jest clean (i to ok)',
     titleAccent: 'commentary',
   },
 
@@ -205,6 +205,8 @@ export const dictionary = {
     save: 'zapisz',
     yes: 'tak',
     no: 'nie',
+    notFoundTitle: '404',
+    notFoundSubtitle: 'Not Found',
     notFoundCta: '← strona główna',
   },
 };

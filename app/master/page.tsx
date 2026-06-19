@@ -15,7 +15,7 @@ export default async function MasterPage() {
     .from('admin_profiles')
     .select('is_operator')
     .eq('id', session.user.id)
-    .single();
+    .single<{ is_operator: boolean }>();
 
   if (!profile?.is_operator) redirect('/admin');
 

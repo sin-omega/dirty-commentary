@@ -50,9 +50,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublicAdminPath(pathname)) {
-    // Zalogowany admin wchodzący na /admin/login -> przekieruj do panelu.
+    // Zalogowany użytkownik wchodzący na /admin/login -> przekieruj do
+    // właściwego panelu (operator do /master, zwykły admin do /admin).
     if (session && pathname === '/admin/login') {
-      return NextResponse.redirect(new URL('/admin', request.url));
+      const { data: profile } = await supabase
+        .from('admin_profiles')
+        .select('is_operator')
+        .eq('id', session.user.id)
+        .single<{ is_operator: boolean }>();
+
+      const destination = profile?.is_operator ? '/master' : '/admin';
+      return NextResponse.redirect(new URL(destination, request.url));
     }
     return response;
   }
@@ -69,7 +77,7 @@ export async function middleware(request: NextRequest) {
       .from('admin_profiles')
       .select('is_operator')
       .eq('id', session.user.id)
-      .single();
+      .single<{ is_operator: boolean }>();
 
     if (!profile?.is_operator) {
       return NextResponse.redirect(new URL('/admin', request.url));

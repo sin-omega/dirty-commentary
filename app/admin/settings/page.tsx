@@ -15,7 +15,7 @@ export default async function SettingsPage() {
     .from('admin_profiles')
     .select('username, display_name, signature')
     .eq('id', session.user.id)
-    .single();
+    .single<{ username: string; display_name: string; signature: string }>();
 
   if (!profile) redirect('/admin/login');
 

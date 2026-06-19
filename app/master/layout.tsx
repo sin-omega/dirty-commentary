@@ -16,7 +16,7 @@ export default async function MasterLayout({ children }: { children: React.React
       .from('admin_profiles')
       .select('display_name')
       .eq('id', session.user.id)
-      .single();
+      .single<{ display_name: string }>();
     displayName = profile?.display_name ?? '';
   }
 

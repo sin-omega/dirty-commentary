@@ -62,7 +62,7 @@ export function SubmissionListRow({
         .from('admin_profiles')
         .select('signature')
         .eq('id', session.user.id)
-        .single();
+        .single<{ signature: string }>();
       signature = profile?.signature ?? '';
     }
 

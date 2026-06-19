@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
 import { usernameToInternalEmail, normalizeUsername } from '@/lib/auth-helpers';
@@ -10,7 +9,6 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 
 export function LoginForm() {
-  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,14 +33,21 @@ export function LoginForm() {
       return;
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('admin_profiles')
       .select('is_operator')
-      .eq('id', data.session.user.id)
-      .single();
+      .eq('id', data.user.id)
+      .single<{ is_operator: boolean }>();
 
-    router.push(profile?.is_operator ? '/master' : '/admin');
-    router.refresh();
+    const destination = !profileError && profile?.is_operator ? '/master' : '/admin';
+
+    // Pełne przeładowanie (zamiast router.push) - middleware czyta sesję z
+    // cookies przy każdym requeście, a świeżo ustawiona sesja z
+    // signInWithPassword potrzebuje pełnego nawigacyjnego requestu, żeby
+    // cookies zdążyły dotrzeć do przeglądarki. router.push (client-side
+    // navigation) potrafił wyprzedzić ten zapis i middleware widział brak
+    // sesji, odsyłając z powrotem na /admin/login -> /admin.
+    window.location.href = destination;
   }
 
   return (

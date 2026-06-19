@@ -27,7 +27,7 @@ export async function POST() {
     .from('admin_profiles')
     .select('id, is_operator')
     .eq('id', session.user.id)
-    .single();
+    .single<{ id: string; is_operator: boolean }>();
 
   if (!profile?.is_operator) {
     return NextResponse.json({ success: false, reason: 'forbidden' }, { status: 403 });

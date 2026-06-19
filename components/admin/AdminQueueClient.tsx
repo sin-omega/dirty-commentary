@@ -60,7 +60,7 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
         .from('admin_profiles')
         .select('signature')
         .eq('id', session.user.id)
-        .single();
+        .single<{ signature: string }>();
       setMySignature(myProfile?.signature ?? '');
     }
 

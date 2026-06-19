@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     .from('invite_tokens')
     .select('expires_at, used_at')
     .eq('token', token)
-    .single();
+    .single<{ expires_at: string; used_at: string | null }>();
 
   if (error || !inviteToken) {
     return NextResponse.json({ valid: false, reason: 'invalid' });

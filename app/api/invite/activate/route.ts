@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     .from('invite_tokens')
     .select('id, expires_at, used_at')
     .eq('token', token)
-    .single();
+    .single<{ id: string; expires_at: string; used_at: string | null }>();
 
   if (tokenError || !inviteToken) {
     return NextResponse.json({ success: false, reason: 'invalid' }, { status: 400 });
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     .from('admin_profiles')
     .select('id')
     .eq('username', normalizedUsername)
-    .maybeSingle();
+    .maybeSingle<{ id: string }>();
 
   if (existingProfile) {
     return NextResponse.json({ success: false, reason: 'username-taken' }, { status: 409 });
