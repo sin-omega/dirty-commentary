@@ -1,9 +1,9 @@
 // components/admin/CommentEditor.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
+import { X, AlertTriangle, Maximize2, Minimize2, Image } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
 import { asUntyped } from '@/lib/supabase/untyped';
@@ -14,8 +14,6 @@ import { Button } from '@/components/ui/Button';
 import { EditorToolbar } from '@/components/admin/EditorToolbar';
 import { SchedulePicker } from '@/components/admin/SchedulePicker';
 import { Toast } from '@/components/ui/Toast';
-
-type EditorMode = 'markdown' | 'preview';
 
 interface CommentEditorProps {
   submission: Submission;
@@ -28,10 +26,10 @@ interface CommentEditorProps {
 export function CommentEditor({ submission, signature: initialSignature, onClose, onSaved, readOnly = false }: CommentEditorProps) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [editorMode, setEditorMode] = useState<EditorMode>('markdown');
+  const backdropRef = useRef<HTMLDivElement>(null);
+
   const [body, setBody] = useState(() => {
     let text = submission.comment_body || '';
-    // Automatycznie wklej podpis na końcu jeśli nie jest już tam
     const sig = initialSignature?.trim();
     if (sig && text.trim() && !text.trimEnd().endsWith(sig)) {
       text = `${text}\n\n${sig}`;
@@ -43,6 +41,7 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const [showImageCopiedToast, setShowImageCopiedToast] = useState(false);
   const [showScheduledToast, setShowScheduledToast] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -51,7 +50,7 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   const usesChannelVariable = body.includes('%channel_link%');
   const showMissingChannelWarning = usesChannelVariable && !hasChannelLink;
 
-  // Podgląd renderuje cały body (podpis jest już w tekście)
+  // Renderuj markdown na żywo — backdrop zawsze pokazuje sformatowany tekst
   const previewHtml = renderWhatsAppMarkdownToHtml(body);
 
   // Pobierz signed URL dla obrazu zgłoszenia
@@ -66,6 +65,14 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
       });
     return () => { cancelled = true; };
   }, [submission.image_path]);
+
+  // Sync scroll textarea ↔ backdrop
+  const handleScroll = useCallback(() => {
+    if (textareaRef.current && backdropRef.current) {
+      backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+      backdropRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  }, []);
 
   function applyTextareaOp(op: { text: string; selectionStart: number; selectionEnd: number }) {
     setBody(op.text);
@@ -130,12 +137,11 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
     }
   }
 
-  async function handleCopyToWhatsApp() {
+  async function handleCopyText() {
     setIsSaving(true);
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
 
-    // Kopiuj tylko tekst — WhatsApp sam zinterpretuje markdown po wklejeniu.
     await navigator.clipboard.writeText(body);
 
     const { error } = await asUntyped(supabase)
@@ -157,6 +163,21 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
     }
   }
 
+  async function handleCopyImage() {
+    if (!imageUrl) return;
+    try {
+      const response = await fetch(imageUrl);
+      const imageBlob = await response.blob();
+      const imageType = imageBlob.type || 'image/png';
+      await navigator.clipboard.write([
+        new ClipboardItem({ [imageType]: imageBlob }),
+      ]);
+      setShowImageCopiedToast(true);
+    } catch {
+      // Fallback: nic nie kopiuj
+    }
+  }
+
   const isEmpty = body.trim().length === 0;
 
   // Wrapper — fullscreen vs modal
@@ -167,13 +188,6 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   const containerClass = isFullscreen
     ? 'flex h-full flex-col bg-white'
     : 'flex h-full w-full flex-col bg-white sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-card sm:border-2 sm:border-bg-ink sm:shadow-chunky';
-
-  const modeToggleClass = (active: boolean) =>
-    `px-3 py-1 text-xs font-semibold transition-colors ${
-      active
-        ? 'bg-bg-ink text-white'
-        : 'text-bg-ink/50 hover:text-bg-ink'
-    }`;
 
   return (
     <div className={wrapperClass}>
@@ -221,9 +235,9 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
           </div>
         </div>
 
-        {/* Toolbar + mode toggle */}
+        {/* Toolbar */}
         {!readOnly && (
-          <div className="flex shrink-0 items-center gap-3 border-b-2 border-bg-ink/5 px-4 py-2">
+          <div className="shrink-0 border-b-2 border-bg-ink/5 px-4 py-2">
             <EditorToolbar
               onWrapFormat={handleWrapFormat}
               onMonospaceBlock={handleMonospaceBlock}
@@ -231,29 +245,13 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
               onInsertVariable={handleInsertVariable}
               hasChannelLink={hasChannelLink}
             />
-            <div className="flex shrink-0 gap-0.5 bg-bg-ink/5 p-0.5">
-              <button
-                type="button"
-                onClick={() => setEditorMode('markdown')}
-                className={modeToggleClass(editorMode === 'markdown')}
-              >
-                {dictionary.editor.modeMarkdown}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditorMode('preview')}
-                className={modeToggleClass(editorMode === 'preview')}
-              >
-                {dictionary.editor.previewLabel}
-              </button>
-            </div>
           </div>
         )}
 
-        {/* Scrollable body — edytor/podgląd (lewo) + obraz (prawo) */}
+        {/* Scrollable body — WYSIWYG edytor + obraz */}
         <div className="flex-1 overflow-y-auto">
           <div className={`flex gap-4 p-4 ${isFullscreen ? 'flex-row' : 'flex-col lg:flex-row'}`}>
-            {/* Edytor / podgląd */}
+            {/* WYSIWYG edytor — textarea + backdrop overlay */}
             <div className={`flex min-w-0 flex-1 flex-col gap-3 ${isFullscreen ? '' : 'lg:flex-none lg:w-1/2'}`}>
               {showMissingChannelWarning && (
                 <p className="flex items-center gap-1.5 border-2 border-scheduled-border bg-scheduled px-3 py-1.5 text-sm text-bg-ink/70">
@@ -262,22 +260,23 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
                 </p>
               )}
 
-              {editorMode === 'markdown' || readOnly ? (
+              <div className="wysiwyg-container flex-1">
+                <div
+                  ref={backdropRef}
+                  className="wa-preview wysiwyg-backdrop"
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
                 <textarea
                   ref={textareaRef}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
+                  onScroll={handleScroll}
                   placeholder={dictionary.editor.textareaPlaceholder}
                   readOnly={readOnly}
                   disabled={readOnly}
-                  className="w-full flex-1 resize-none border-2 border-bg-ink/20 p-3 font-mono text-sm outline-none focus:border-accent disabled:opacity-60"
+                  className="wysiwyg-textarea"
                 />
-              ) : (
-                <div
-                  className="wa-preview flex-1 border-2 border-bg-ink/20 p-4 text-sm text-bg-ink"
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
-                />
-              )}
+              </div>
             </div>
 
             {/* Obraz zgłoszenia — pełen screenshot */}
@@ -294,7 +293,7 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
           </div>
         </div>
 
-        {/* Footer — akcje */}
+        {/* Footer — 3 przyciski: zaplanuj / kopiuj tekst / kopiuj obraz */}
         {!readOnly && (
           <div className="flex shrink-0 flex-col gap-2 border-t-2 border-bg-ink/10 p-4 sm:flex-row">
             <Button
@@ -310,9 +309,18 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
               className="flex-1"
               disabled={isEmpty}
               isLoading={isSaving}
-              onClick={handleCopyToWhatsApp}
+              onClick={handleCopyText}
             >
               {dictionary.editor.copyCta}
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              disabled={!imageUrl}
+              onClick={handleCopyImage}
+            >
+              <Image size={16} />
+              {dictionary.editor.copyImageCta}
             </Button>
           </div>
         )}
@@ -326,6 +334,7 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
       />
 
       <Toast message={dictionary.editor.copiedToast} show={showCopiedToast} onHide={() => setShowCopiedToast(false)} />
+      <Toast message={dictionary.editor.imageCopiedToast} show={showImageCopiedToast} onHide={() => setShowImageCopiedToast(false)} />
       <Toast message={dictionary.editor.scheduleSavedToast} show={showScheduledToast} onHide={() => setShowScheduledToast(false)} />
     </div>
   );

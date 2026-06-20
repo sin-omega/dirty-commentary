@@ -28,7 +28,6 @@ body {
 
 .wa-preview .wa-inline-code {
   background: rgba(0, 0, 0, 0.08);
-
   padding: 1px 5px;
   font-family: 'Courier New', monospace;
   font-size: 0.92em;
@@ -65,4 +64,65 @@ body {
 }
 .tabs-scroll {
   scrollbar-width: none;
+}
+
+/* WYSIWYG edytor — overlay technique: textarea z przezroczystym tekstem
+   + backdrop div renderujący WhatsApp markdown na żywo. Oba mają identyczne
+   font/padding/line-height żeby się idealnie nakładały. */
+.wysiwyg-container {
+  position: relative;
+}
+
+.wysiwyg-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.75rem;
+  color: #1A1A1A;
+  border: 2px solid rgba(26, 26, 26, 0.2);
+}
+
+.wysiwyg-backdrop::-webkit-scrollbar {
+  display: none;
+}
+.wysiwyg-backdrop {
+  scrollbar-width: none;
+}
+
+.wysiwyg-textarea {
+  position: relative;
+  width: 100%;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.75rem;
+  color: transparent;
+  caret-color: #1A1A1A;
+  background: transparent;
+  resize: none;
+  outline: none;
+  border: 2px solid transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wysiwyg-textarea:focus {
+  border-color: transparent;
+}
+
+.wysiwyg-container:focus-within .wysiwyg-backdrop {
+  border-color: #D4537E;
+}
+
+.wysiwyg-container:focus-within .wysiwyg-textarea {
+  border-color: transparent;
 }
