@@ -12,12 +12,18 @@ export default async function MasterLayout({ children }: { children: React.React
 
   let displayName = '';
   if (user) {
-    const { data: profile } = await supabase
-      .from('admin_profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .single<{ display_name: string }>();
-    displayName = profile?.display_name ?? '';
+    try {
+      const { data: profile } = await supabase
+        .from('admin_profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .single<{ display_name: string }>();
+      displayName = profile?.display_name ?? '';
+    } catch {
+      // Błąd zapytania profilu (np. RLS recursion, brak wiersza) —
+      // kontynuujemy bez displayName zamiast wywalać 500 na SSR.
+      displayName = '';
+    }
   }
 
   const initials = displayName

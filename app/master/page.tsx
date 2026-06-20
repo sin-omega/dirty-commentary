@@ -19,6 +19,8 @@ export default async function MasterPage() {
     .eq('id', user.id)
     .single<{ is_operator: boolean }>();
 
+  // Akceptujemy profileError (gdyby RLS znowu zepsuło) — bezpieczny
+  // fallback do /admin zamiast wywalenia 500-tki SSR.
   if (!profile?.is_operator) redirect('/admin');
 
   const { data: inviteTokens } = await asUntyped(supabase)

@@ -11,11 +11,18 @@ export default async function SettingsPage() {
 
   if (!user) redirect('/admin/login');
 
-  const { data: profile } = await supabase
-    .from('admin_profiles')
-    .select('username, display_name, signature')
-    .eq('id', user.id)
-    .single<{ username: string; display_name: string; signature: string }>();
+  let profile: { username: string; display_name: string; signature: string } | null = null;
+  try {
+    const result = await supabase
+      .from('admin_profiles')
+      .select('username, display_name, signature')
+      .eq('id', user.id)
+      .single<{ username: string; display_name: string; signature: string }>();
+    profile = result.data;
+  } catch {
+    // Błąd zapytania profilu — przekieruj do loginu.
+    redirect('/admin/login');
+  }
 
   if (!profile) redirect('/admin/login');
 

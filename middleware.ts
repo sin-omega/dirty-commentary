@@ -63,13 +63,21 @@ export async function middleware(request: NextRequest) {
     // Zalogowany użytkownik wchodzący na /admin/login -> przekieruj do
     // właściwego panelu (operator do /master, zwykły admin do /admin).
     if (user && pathname === '/admin/login') {
-      const { data: profile } = await supabase
-        .from('admin_profiles')
-        .select('is_operator')
-        .eq('id', user.id)
-        .single<{ is_operator: boolean }>();
+      let isOperator = false;
+      try {
+        const { data: profile } = await supabase
+          .from('admin_profiles')
+          .select('is_operator')
+          .eq('id', user.id)
+          .single<{ is_operator: boolean }>();
+        isOperator = profile?.is_operator === true;
+      } catch {
+        // Query na admin_profiles nie powiodło się (np. RLS recursion,
+        // brak wiersza profilu) — bezpieczny fallback do /admin.
+        isOperator = false;
+      }
 
-      const destination = profile?.is_operator ? '/master' : '/admin';
+      const destination = isOperator ? '/master' : '/admin';
       return NextResponse.redirect(new URL(destination, request.url));
     }
     return response;
@@ -83,13 +91,20 @@ export async function middleware(request: NextRequest) {
   // /master wymaga is_operator = true - sprawdzane też w samym page.tsx jako
   // druga linia obrony, ale tu odcinamy najwcześniej możliwe.
   if (pathname.startsWith('/master')) {
-    const { data: profile } = await supabase
-      .from('admin_profiles')
-      .select('is_operator')
-      .eq('id', user.id)
-      .single<{ is_operator: boolean }>();
+    let isOperator = false;
+    try {
+      const { data: profile } = await supabase
+        .from('admin_profiles')
+        .select('is_operator')
+        .eq('id', user.id)
+        .single<{ is_operator: boolean }>();
+      isOperator = profile?.is_operator === true;
+    } catch {
+      // Query na admin_profiles nie powiodło się — bezpieczny fallback.
+      isOperator = false;
+    }
 
-    if (!profile?.is_operator) {
+    if (!isOperator) {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
   }

@@ -52,6 +52,10 @@ export function LoginForm() {
       .single<{ is_operator: boolean }>();
 
     if (profileError) {
+      // Logowanie Supabase się udało, ale query na admin_profiles
+      // nie powiodło się. To zazwyczaj oznacza problem z RLS
+      // (np. nieskończoną rekurencję w policy) lub brak wiersza profilu.
+      console.error('[LoginForm] Profile query failed:', profileError.message, profileError.code);
       setError(dictionary.adminLogin.genericError);
       setIsSubmitting(false);
       return;
