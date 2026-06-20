@@ -7,14 +7,14 @@ import { SettingsForm } from '@/components/admin/SettingsForm';
 
 export default async function SettingsPage() {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session) redirect('/admin/login');
+  if (!user) redirect('/admin/login');
 
   const { data: profile } = await supabase
     .from('admin_profiles')
     .select('username, display_name, signature')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single<{ username: string; display_name: string; signature: string }>();
 
   if (!profile) redirect('/admin/login');
@@ -33,7 +33,7 @@ export default async function SettingsPage() {
         username={profile.username}
         displayName={profile.display_name}
         initialSignature={profile.signature}
-        userId={session.user.id}
+        userId={user.id}
       />
     </div>
   );

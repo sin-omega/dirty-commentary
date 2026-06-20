@@ -40,7 +40,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
   const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/master');
@@ -52,11 +52,11 @@ export async function middleware(request: NextRequest) {
   if (isPublicAdminPath(pathname)) {
     // Zalogowany użytkownik wchodzący na /admin/login -> przekieruj do
     // właściwego panelu (operator do /master, zwykły admin do /admin).
-    if (session && pathname === '/admin/login') {
+    if (user && pathname === '/admin/login') {
       const { data: profile } = await supabase
         .from('admin_profiles')
         .select('is_operator')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single<{ is_operator: boolean }>();
 
       const destination = profile?.is_operator ? '/master' : '/admin';
@@ -65,7 +65,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (!session) {
+  if (!user) {
     const loginUrl = new URL('/admin/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
@@ -76,7 +76,7 @@ export async function middleware(request: NextRequest) {
     const { data: profile } = await supabase
       .from('admin_profiles')
       .select('is_operator')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single<{ is_operator: boolean }>();
 
     if (!profile?.is_operator) {

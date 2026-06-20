@@ -27,11 +27,23 @@ export function LoginForm() {
       password,
     });
 
-    if (signInError || !data.session) {
+    if (signInError || !data.session || !data.user) {
       setError(dictionary.adminLogin.genericError);
       setIsSubmitting(false);
       return;
     }
+
+    // signInWithPassword zwraca dane sesji w odpowiedzi, ale wewnętrzny stan
+    // klienta (token używany przy kolejnych zapytaniach REST/RLS) bywa
+    // zsynchronizowany asynchronicznie ułamek sekundy później. Zapytanie
+    // o is_operator wykonane od razu potrafiło więc polecieć bez właściwego
+    // tokenu auth, RLS odrzucał je jako 'anon', a profile zawsze wracał
+    // null -> destination zawsze '/admin'. setSession() ustawia token
+    // synchronicznie przed kolejnym zapytaniem.
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
 
     const { data: profile, error: profileError } = await supabase
       .from('admin_profiles')
@@ -39,7 +51,13 @@ export function LoginForm() {
       .eq('id', data.user.id)
       .single<{ is_operator: boolean }>();
 
-    const destination = !profileError && profile?.is_operator ? '/master' : '/admin';
+    if (profileError) {
+      setError(dictionary.adminLogin.genericError);
+      setIsSubmitting(false);
+      return;
+    }
+
+    const destination = profile?.is_operator ? '/master' : '/admin';
 
     // Pełne przeładowanie (zamiast router.push) - middleware czyta sesję z
     // cookies przy każdym requeście, a świeżo ustawiona sesja z

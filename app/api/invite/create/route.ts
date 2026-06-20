@@ -20,15 +20,15 @@ const TOKEN_TTL_HOURS = 48;
 export async function POST() {
   const supabase = createClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     return NextResponse.json({ success: false, reason: 'unauthenticated' }, { status: 401 });
   }
 
   const { data: profile } = await supabase
     .from('admin_profiles')
     .select('id, is_operator')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single<{ id: string; is_operator: boolean }>();
 
   if (!profile?.is_operator) {

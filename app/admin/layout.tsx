@@ -7,15 +7,15 @@ import { LogoutButton } from '@/components/admin/LogoutButton';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   const { baseName, accent } = splitBrandName();
 
   let displayName = '';
-  if (session) {
+  if (user) {
     const { data: profile } = await supabase
       .from('admin_profiles')
       .select('display_name')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single<{ display_name: string }>();
     displayName = profile?.display_name ?? '';
   }
