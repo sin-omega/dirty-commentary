@@ -12,6 +12,8 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@/lib/supabase/server';
+import { asUntyped } from '@/lib/supabase/untyped';
+import type { InviteToken } from '@/lib/database.types';
 
 const TOKEN_TTL_HOURS = 48;
 
@@ -36,7 +38,7 @@ export async function POST() {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + TOKEN_TTL_HOURS * 60 * 60 * 1000).toISOString();
 
-  const { data: inviteToken, error } = await supabase
+  const { data: inviteToken, error } = await asUntyped(supabase)
     .from('invite_tokens')
     .insert({
       token,
@@ -44,7 +46,7 @@ export async function POST() {
       expires_at: expiresAt,
     })
     .select('*')
-    .single();
+    .single<InviteToken>();
 
   if (error || !inviteToken) {
     return NextResponse.json({ success: false, reason: 'insert-failed' }, { status: 500 });

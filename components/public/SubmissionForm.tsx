@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { Upload, X, Check, AlertTriangle, ImagePlus } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { isValidImageFile, isValidNickname, isValidUrl } from '@/lib/validation';
 import { Button } from '@/components/ui/Button';
 
@@ -97,7 +98,7 @@ export function SubmissionForm() {
 
       if (uploadError) throw uploadError;
 
-      const { error: insertError } = await supabase.from('submissions').insert({
+      const { error: insertError } = await asUntyped(supabase).from('submissions').insert({
         image_path: storagePath,
         sender_nickname: nickname.trim(),
         channel_link: channelLink.trim() || null,

@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { buildFinalMessage, renderWhatsAppMarkdownToHtml } from '@/lib/whatsapp-format';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -27,7 +28,7 @@ export function SettingsForm({ username, displayName, initialSignature, userId }
     setError(null);
 
     const supabase = createClient();
-    const { error: updateError } = await supabase
+    const { error: updateError } = await asUntyped(supabase)
       .from('admin_profiles')
       .update({ signature })
       .eq('id', userId);

@@ -7,6 +7,7 @@ import { X, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { buildFinalMessage, renderWhatsAppMarkdownToHtml } from '@/lib/whatsapp-format';
 import { wrapSelection, prefixLines } from '@/lib/textarea-formatting';
 import type { Submission } from '@/lib/database.types';
@@ -86,7 +87,7 @@ export function CommentEditor({ submission, signature, onClose, onSaved, readOnl
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
 
-    const { error } = await supabase
+    const { error } = await asUntyped(supabase)
       .from('submissions')
       .update({
         comment_body: body,
@@ -113,7 +114,7 @@ export function CommentEditor({ submission, signature, onClose, onSaved, readOnl
 
     await navigator.clipboard.writeText(finalMessage);
 
-    const { error } = await supabase
+    const { error } = await asUntyped(supabase)
       .from('submissions')
       .update({
         comment_body: body,

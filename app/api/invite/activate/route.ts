@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { usernameToInternalEmail, isValidUsername, normalizeUsername } from '@/lib/auth-helpers';
 
 export async function POST(request: Request) {
@@ -79,22 +80,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, reason: 'create-failed' }, { status: 500 });
   }
 
-  // 4. Stwórz wiersz w admin_profiles explicite (trigger ma "on conflict do
-  //    nothing", więc to jest bezpieczne nawet jeśli trigger też próbuje).
-  const { error: profileError } = await supabaseAdmin.from('admin_profiles').upsert({
-    id: newUser.user.id,
-    username: normalizedUsername,
-    display_name: displayName,
-    signature: '',
-    is_operator: false,
-  });
+  // 4. Trigger SQL (on_auth_user_created) powinien był już stworzyć wiersz w
+  //    admin_profiles automatycznie przy createUser powyżej (z danych
+  //    user_metadata). Nadpisujemy go tutaj wartościami z formularza
+  //    aktywacji (update), a jeśli z jakiegoś powodu trigger nie zadziałał,
+  //    wstawiamy wiersz explicite (insert jako fallback).
+  //
+  // asUntyped() omija znany problem z wnioskowaniem przeciążeń
+  // insert/update/upsert w postgrest-js - patrz lib/supabase/untyped.ts.
+  const supabaseUntyped = asUntyped(supabaseAdmin);
 
-  if (profileError) {
+  const { data: updatedRows, error: updateError } = await supabaseUntyped
+    .from('admin_profiles')
+    .update({
+      username: normalizedUsername,
+      display_name: displayName,
+      signature: '',
+      is_operator: false,
+    })
+    .eq('id', newUser.user.id)
+    .select('id');
+
+  if (updateError) {
     return NextResponse.json({ success: false, reason: 'profile-failed' }, { status: 500 });
   }
 
+  if (!updatedRows || updatedRows.length === 0) {
+    // Trigger nie zdążył/nie zadziałał - wiersza jeszcze nie ma, wstawiamy go.
+    const { error: insertError } = await supabaseUntyped.from('admin_profiles').insert({
+      id: newUser.user.id,
+      username: normalizedUsername,
+      display_name: displayName,
+      signature: '',
+      is_operator: false,
+    });
+
+    if (insertError) {
+      return NextResponse.json({ success: false, reason: 'profile-failed' }, { status: 500 });
+    }
+  }
+
   // 5. Oznacz token jako wykorzystany.
-  await supabaseAdmin
+  await supabaseUntyped
     .from('invite_tokens')
     .update({ used_at: new Date().toISOString(), created_admin_id: newUser.user.id })
     .eq('id', inviteToken.id);

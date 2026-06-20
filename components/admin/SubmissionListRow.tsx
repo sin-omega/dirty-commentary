@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Copy } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { formatDateTime } from '@/lib/format-time';
 import { applyVariables, buildFinalMessage } from '@/lib/whatsapp-format';
 import type { Submission } from '@/lib/database.types';
@@ -75,7 +76,7 @@ export function SubmissionListRow({
 
     // Kopiujący "obsługuje" zgłoszenie teraz - podpis pochodzi od osoby
     // wykonującej akcję kopiowania, nie od autora treści (sekcja 5.4).
-    await supabase
+    await asUntyped(supabase)
       .from('submissions')
       .update({ status: 'done', handled_by: session?.user.id })
       .eq('id', submission.id);
