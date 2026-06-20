@@ -2,9 +2,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Copy, ShieldCheck } from 'lucide-react';
+import { Plus, Copy, ShieldCheck, Trash2 } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { formatDateTime } from '@/lib/format-time';
 import type { AdminProfile, InviteToken } from '@/lib/database.types';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +25,9 @@ export function MasterPanel({ initialInviteTokens, initialAdmins }: MasterPanelP
   const [showCopiedToast, setShowCopiedToast] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminProfile | null>(null);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [deleteTokenTarget, setDeleteTokenTarget] = useState<InviteToken | null>(null);
+  const [isDeletingToken, setIsDeletingToken] = useState(false);
+  const [showTokenDeletedToast, setShowTokenDeletedToast] = useState(false);
 
   async function handleGenerate() {
     setIsGenerating(true);
@@ -51,14 +55,27 @@ export function MasterPanel({ initialInviteTokens, initialAdmins }: MasterPanelP
     setIsDeactivating(true);
     const supabase = createClient();
 
-    // "Dezaktywacja" w tym MVP: usuwamy wiersz admin_profiles (RLS policy
-    // "operator deletes admin profiles" pozwala na to operatorowi). Konto w
-    // auth.users zostaje, ale bez profilu nie przejdzie dalej w aplikacji.
     await supabase.from('admin_profiles').delete().eq('id', deactivateTarget.id);
 
     setIsDeactivating(false);
     setAdmins((prev) => prev.filter((a) => a.id !== deactivateTarget.id));
     setDeactivateTarget(null);
+  }
+
+  async function handleDeleteTokenConfirmed() {
+    if (!deleteTokenTarget) return;
+    setIsDeletingToken(true);
+    const supabase = createClient();
+
+    await asUntyped(supabase)
+      .from('invite_tokens')
+      .delete()
+      .eq('id', deleteTokenTarget.id);
+
+    setIsDeletingToken(false);
+    setInviteTokens((prev) => prev.filter((t) => t.id !== deleteTokenTarget.id));
+    setDeleteTokenTarget(null);
+    setShowTokenDeletedToast(true);
   }
 
   return (
@@ -74,44 +91,57 @@ export function MasterPanel({ initialInviteTokens, initialAdmins }: MasterPanelP
           </Button>
         </div>
 
-        <div className="flex flex-col gap-2">
-          {inviteTokens.map((invite) => {
-            const isUsed = Boolean(invite.used_at);
-            const isExpired = !isUsed && new Date(invite.expires_at) < new Date();
-            return (
-              <div
-                key={invite.id}
-                className="flex items-center justify-between gap-3 rounded-card border-2 border-bg-ink/10 px-3 py-2.5"
-              >
-                <div className="flex flex-col">
-                  <span
-                    className={`text-sm font-medium ${
-                      isUsed ? 'text-bg-ink/40' : isExpired ? 'text-danger-fg' : 'text-bg-ink'
-                    }`}
-                  >
-                    {isUsed
-                      ? dictionary.master.usedLabel
-                      : isExpired
-                        ? dictionary.activate.expiredTokenTitle
-                        : dictionary.master.unusedLabel}
-                  </span>
-                  <span className="text-xs text-bg-ink/50">
-                    {dictionary.master.expiresLabel(formatDateTime(invite.expires_at))}
-                  </span>
+        {inviteTokens.length === 0 ? (
+          <p className="text-sm text-bg-ink/60">{dictionary.master.adminsEmpty}</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {inviteTokens.map((invite) => {
+              const isUsed = Boolean(invite.used_at);
+              const isExpired = !isUsed && new Date(invite.expires_at) < new Date();
+              return (
+                <div
+                  key={invite.id}
+                  className="flex items-center justify-between gap-3 rounded-card border-2 border-bg-ink/10 px-3 py-2.5"
+                >
+                  <div className="flex flex-col">
+                    <span
+                      className={`text-sm font-medium ${
+                        isUsed ? 'text-bg-ink/40' : isExpired ? 'text-danger-fg' : 'text-bg-ink'
+                      }`}
+                    >
+                      {isUsed
+                        ? dictionary.master.usedLabel
+                        : isExpired
+                          ? dictionary.activate.expiredTokenTitle
+                          : dictionary.master.unusedLabel}
+                    </span>
+                    <span className="text-xs text-bg-ink/50">
+                      {dictionary.master.expiresLabel(formatDateTime(invite.expires_at))}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {!isUsed && !isExpired && (
+                      <button
+                        onClick={() => handleCopyLink(invite.token)}
+                        className="touch-target flex items-center gap-1.5 rounded-pill border-2 border-bg-ink bg-white px-3 py-1.5 text-sm font-semibold text-bg-ink hover:bg-accent-soft"
+                      >
+                        <Copy size={14} />
+                        {dictionary.master.copyLinkCta}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setDeleteTokenTarget(invite)}
+                      className="touch-target flex items-center justify-center rounded-pill border-2 border-danger-border bg-danger-bg px-2.5 py-1.5 text-sm font-semibold text-danger-fg hover:bg-danger-border/30"
+                      title={dictionary.master.deleteTokenCta}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                {!isUsed && !isExpired && (
-                  <button
-                    onClick={() => handleCopyLink(invite.token)}
-                    className="touch-target flex shrink-0 items-center gap-1.5 rounded-pill border-2 border-bg-ink bg-white px-3 py-1.5 text-sm font-semibold text-bg-ink hover:bg-accent-soft"
-                  >
-                    <Copy size={14} />
-                    {dictionary.master.copyLinkCta}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       <Card className="p-6">
@@ -163,7 +193,19 @@ export function MasterPanel({ initialInviteTokens, initialAdmins }: MasterPanelP
         isLoading={isDeactivating}
       />
 
+      <ConfirmDialog
+        open={Boolean(deleteTokenTarget)}
+        title={dictionary.master.deleteTokenConfirmTitle}
+        body={dictionary.master.deleteTokenConfirmBody}
+        confirmLabel={dictionary.master.deleteTokenConfirmCta}
+        cancelLabel={dictionary.master.deleteTokenCancelCta}
+        onConfirm={handleDeleteTokenConfirmed}
+        onCancel={() => setDeleteTokenTarget(null)}
+        isLoading={isDeletingToken}
+      />
+
       <Toast message={dictionary.master.linkCopiedToast} show={showCopiedToast} onHide={() => setShowCopiedToast(false)} />
+      <Toast message={dictionary.master.tokenDeletedToast} show={showTokenDeletedToast} onHide={() => setShowTokenDeletedToast(false)} />
     </div>
   );
 }

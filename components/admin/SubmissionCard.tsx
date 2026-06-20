@@ -48,7 +48,7 @@ export function SubmissionCard({
     <Card
       className={`relative overflow-hidden transition-opacity ${
         isOverlayed ? 'opacity-75' : ''
-      } ${interactive ? 'cursor-pointer hover:shadow-chunky-sm' : ''}`}
+      } ${interactive && !isOverlayed ? 'cursor-pointer hover:shadow-chunky-sm' : ''}`}
       onClick={() => interactive && !isOverlayed && onOpen(submission)}
     >
       {isOverlayed && (

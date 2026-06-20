@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react';
 import { dictionary, splitBrandName } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/server';
 import { LogoutButton } from '@/components/admin/LogoutButton';
+import { PanelSwitch } from '@/components/admin/PanelSwitch';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -11,18 +12,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { baseName, accent } = splitBrandName();
 
   let displayName = '';
+  let isOperator = false;
   if (user) {
     try {
       const { data: profile } = await supabase
         .from('admin_profiles')
-        .select('display_name')
+        .select('display_name, is_operator')
         .eq('id', user.id)
-        .single<{ display_name: string }>();
+        .single<{ display_name: string; is_operator: boolean }>();
       displayName = profile?.display_name ?? '';
+      isOperator = profile?.is_operator === true;
     } catch {
-      // Błąd zapytania profilu (np. RLS recursion, brak wiersza) —
-      // kontynuujemy bez displayName zamiast wywalać 500 na SSR.
       displayName = '';
+      isOperator = false;
     }
   }
 
@@ -34,12 +36,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-bg-page">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b-2 border-bg-ink bg-white px-4 py-3">
-        <Link href="/admin" className="font-display text-lg font-bold text-bg-ink">
-          {baseName}
-          <span className="text-accent">{accent}</span>
-        </Link>
+    <div className="flex h-screen flex-col overflow-hidden bg-bg-page">
+      <header className="flex shrink-0 items-center justify-between border-b-2 border-bg-ink bg-white px-4 py-3">
+        <div className="flex items-center gap-4">
+          <Link href="/admin" className="font-display text-lg font-bold text-bg-ink">
+            {baseName}
+            <span className="text-accent">{accent}</span>
+          </Link>
+          {isOperator && <PanelSwitch activePath="/admin" />}
+        </div>
 
         <div className="flex items-center gap-2">
           {displayName && (
@@ -61,7 +66,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </header>
 
-      <div className="px-4 py-5">{children}</div>
+      <div className="flex-1 overflow-y-auto px-4 py-5">{children}</div>
     </div>
   );
 }

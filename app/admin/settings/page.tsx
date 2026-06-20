@@ -11,25 +11,27 @@ export default async function SettingsPage() {
 
   if (!user) redirect('/admin/login');
 
-  let profile: { username: string; display_name: string; signature: string } | null = null;
+  let profile: { username: string; display_name: string; signature: string; is_operator: boolean } | null = null;
   try {
     const result = await supabase
       .from('admin_profiles')
-      .select('username, display_name, signature')
+      .select('username, display_name, signature, is_operator')
       .eq('id', user.id)
-      .single<{ username: string; display_name: string; signature: string }>();
+      .single<{ username: string; display_name: string; signature: string; is_operator: boolean }>();
     profile = result.data;
   } catch {
-    // Błąd zapytania profilu — przekieruj do loginu.
     redirect('/admin/login');
   }
 
   if (!profile) redirect('/admin/login');
 
+  // Operator wracający ze settings — trafia na /master, nie na /admin
+  const backHref = profile.is_operator ? '/master' : '/admin';
+
   return (
     <div>
       <div className="mx-auto mb-5 max-w-lg">
-        <Link href="/admin" className="text-sm text-bg-ink/50 hover:text-bg-ink/80">
+        <Link href={backHref} className="text-sm text-bg-ink/50 hover:text-bg-ink/80">
           {dictionary.settings.backCta}
         </Link>
       </div>

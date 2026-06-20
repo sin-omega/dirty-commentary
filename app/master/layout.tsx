@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react';
 import { dictionary, splitBrandName } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/server';
 import { LogoutButton } from '@/components/admin/LogoutButton';
+import { PanelSwitch } from '@/components/admin/PanelSwitch';
 
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -20,8 +21,6 @@ export default async function MasterLayout({ children }: { children: React.React
         .single<{ display_name: string }>();
       displayName = profile?.display_name ?? '';
     } catch {
-      // Błąd zapytania profilu (np. RLS recursion, brak wiersza) —
-      // kontynuujemy bez displayName zamiast wywalać 500 na SSR.
       displayName = '';
     }
   }
@@ -34,12 +33,15 @@ export default async function MasterLayout({ children }: { children: React.React
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-bg-page">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b-2 border-bg-ink bg-white px-4 py-3">
-        <Link href="/admin" className="font-display text-lg font-bold text-bg-ink">
-          {baseName}
-          <span className="text-accent">{accent}</span>
-        </Link>
+    <div className="flex h-screen flex-col overflow-hidden bg-bg-page">
+      <header className="flex shrink-0 items-center justify-between border-b-2 border-bg-ink bg-white px-4 py-3">
+        <div className="flex items-center gap-4">
+          <Link href="/admin" className="font-display text-lg font-bold text-bg-ink">
+            {baseName}
+            <span className="text-accent">{accent}</span>
+          </Link>
+          <PanelSwitch activePath="/master" />
+        </div>
 
         <div className="flex items-center gap-2">
           {displayName && (
@@ -61,7 +63,7 @@ export default async function MasterLayout({ children }: { children: React.React
         </div>
       </header>
 
-      <div className="px-4 py-5">{children}</div>
+      <div className="flex-1 overflow-y-auto px-4 py-5">{children}</div>
     </div>
   );
 }
