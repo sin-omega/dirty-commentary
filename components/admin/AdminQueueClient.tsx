@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
+import { asUntyped } from '@/lib/supabase/untyped';
 import type { Submission } from '@/lib/database.types';
 import { SubmissionCard } from '@/components/admin/SubmissionCard';
 import { SubmissionListRow } from '@/components/admin/SubmissionListRow';
@@ -37,15 +38,19 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
 
     // Tab "kolejka" pokazuje pending + scheduled + done (przygaszone), tab
     // scheduled/done pokazują tylko swój status (sekcja 5.2/5.4/5.5).
-    const { data } = await supabase
+    const { data } = await asUntyped(supabase)
       .from('submissions')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .returns<Submission[]>();
 
     if (data) setSubmissions(data);
 
     // Imiona dla "omówione przez X" / "zaplanował X".
-    const { data: profiles } = await supabase.from('admin_profiles').select('id, display_name');
+    const { data: profiles } = await asUntyped(supabase)
+      .from('admin_profiles')
+      .select('id, display_name')
+      .returns<{ id: string; display_name: string }[]>();
     if (profiles) {
       const map: Record<string, string> = {};
       profiles.forEach((p) => {

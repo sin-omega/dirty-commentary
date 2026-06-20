@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/server';
+import { asUntyped } from '@/lib/supabase/untyped';
+import type { InviteToken, AdminProfile } from '@/lib/database.types';
 import { MasterPanel } from '@/components/admin/MasterPanel';
 
 export default async function MasterPage() {
@@ -19,15 +21,17 @@ export default async function MasterPage() {
 
   if (!profile?.is_operator) redirect('/admin');
 
-  const { data: inviteTokens } = await supabase
+  const { data: inviteTokens } = await asUntyped(supabase)
     .from('invite_tokens')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<InviteToken[]>();
 
-  const { data: admins } = await supabase
+  const { data: admins } = await asUntyped(supabase)
     .from('admin_profiles')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .returns<AdminProfile[]>();
 
   return (
     <div>
