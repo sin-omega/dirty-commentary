@@ -38,6 +38,29 @@ create policy "admins can delete submissions"
 -- admin_profiles
 -- ---------------------------------------------------------------------
 
+-- Funkcja pomocnicza SECURITY DEFINER do sprawdzania czy bieżący
+-- zalogowany użytkownik jest operatorem, z ominięciem RLS przy własnym
+-- zapytaniu wewnętrznym. KRYTYCZNE: bez tego, policy poniżej odwołujące
+-- się do admin_profiles wewnątrz USING na admin_profiles powodują
+-- nieskończoną rekurencję RLS (Postgres musi zastosować RLS też do
+-- podzapytania sprawdzającego policy, co triggeruje tę samą policy
+-- ponownie) - kończy się to błędem "infinite recursion detected in
+-- policy", zwracanym przez PostgREST jako HTTP 500 dla KAŻDEGO zapytania
+-- select na admin_profiles, nie tylko tych próbujących skorzystać z tej
+-- konkretnej policy.
+create or replace function public.is_current_user_operator()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.admin_profiles
+    where id = auth.uid() and is_operator = true
+  );
+$$;
+
 -- każdy zalogowany może czytać WŁASNY profil
 create policy "admin reads own profile"
   on public.admin_profiles for select
@@ -48,9 +71,7 @@ create policy "admin reads own profile"
 create policy "operator reads all profiles"
   on public.admin_profiles for select
   to authenticated
-  using (
-    exists (select 1 from public.admin_profiles where id = auth.uid() and is_operator = true)
-  );
+  using (public.is_current_user_operator());
 
 -- każdy zalogowany może aktualizować WŁASNY profil (np. podpis)
 create policy "admin updates own profile"
@@ -62,17 +83,13 @@ create policy "admin updates own profile"
 create policy "operator manages all profiles"
   on public.admin_profiles for update
   to authenticated
-  using (
-    exists (select 1 from public.admin_profiles where id = auth.uid() and is_operator = true)
-  );
+  using (public.is_current_user_operator());
 
 -- operator może usuwać profile adminów
 create policy "operator deletes admin profiles"
   on public.admin_profiles for delete
   to authenticated
-  using (
-    exists (select 1 from public.admin_profiles where id = auth.uid() and is_operator = true)
-  );
+  using (public.is_current_user_operator());
 
 -- ---------------------------------------------------------------------
 -- invite_tokens
@@ -84,12 +101,8 @@ create policy "operator deletes admin profiles"
 create policy "operator manages invite tokens"
   on public.invite_tokens for all
   to authenticated
-  using (
-    exists (select 1 from public.admin_profiles where id = auth.uid() and is_operator = true)
-  )
-  with check (
-    exists (select 1 from public.admin_profiles where id = auth.uid() and is_operator = true)
-  );
+  using (public.is_current_user_operator())
+  with check (public.is_current_user_operator());
 
 -- UWAGA: weryfikacja tokenu przy aktywacji (/admin/activate/[token]) odbywa
 -- się przez Route Handler z SUPABASE_SERVICE_ROLE_KEY (omija RLS), bo osoba

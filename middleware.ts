@@ -40,7 +40,17 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // getUser() robi rzeczywiste zapytanie sieciowe do Supabase Auth - w
+    // razie awarii sieci/timeoutu traktujemy to jak brak zalogowanego
+    // użytkownika zamiast wywalać całą odpowiedź 500-tką.
+    user = null;
+  }
+
   const { pathname } = request.nextUrl;
 
   const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/master');
