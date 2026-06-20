@@ -1,5 +1,4 @@
 // app/master/page.tsx
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/server';
@@ -37,11 +36,6 @@ export default async function MasterPage() {
 
   return (
     <div>
-      <div className="mx-auto mb-5 max-w-2xl">
-        <Link href="/admin" className="text-sm text-bg-ink/50 hover:text-bg-ink/80">
-          {dictionary.master.backCta}
-        </Link>
-      </div>
       <h1 className="mb-5 text-center font-display text-2xl font-bold text-bg-ink">
         {dictionary.master.title}
       </h1>

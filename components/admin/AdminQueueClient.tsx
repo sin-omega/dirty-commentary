@@ -2,6 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
 import { asUntyped } from '@/lib/supabase/untyped';
@@ -20,9 +21,17 @@ interface AdminQueueClientProps {
 }
 
 export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('pending');
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab');
+    return t === 'scheduled' ? 'scheduled' : t === 'done' ? 'done' : 'pending';
+  });
+
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [handlerNames, setHandlerNames] = useState<Record<string, string>>({});
+  const [handlerSignatures, setHandlerSignatures] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [mySignature, setMySignature] = useState('');
 
@@ -36,8 +45,6 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
     setIsLoading(true);
     const supabase = createClient();
 
-    // Tab "kolejka" pokazuje pending + scheduled + done (przygaszone), tab
-    // scheduled/done pokazują tylko swój status (sekcja 5.2/5.4/5.5).
     const { data } = await asUntyped(supabase)
       .from('submissions')
       .select('*')
@@ -46,17 +53,20 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
 
     if (data) setSubmissions(data);
 
-    // Imiona dla "omówione przez X" / "zaplanował X".
+    // Imiona i podpisy adminów — podpisy potrzebne w tabie "omówione"
     const { data: profiles } = await asUntyped(supabase)
       .from('admin_profiles')
-      .select('id, display_name')
-      .returns<{ id: string; display_name: string }[]>();
+      .select('id, display_name, signature')
+      .returns<{ id: string; display_name: string; signature: string }[]>();
     if (profiles) {
-      const map: Record<string, string> = {};
+      const names: Record<string, string> = {};
+      const sigs: Record<string, string> = {};
       profiles.forEach((p) => {
-        map[p.id] = p.display_name;
+        names[p.id] = p.display_name;
+        sigs[p.id] = p.signature;
       });
-      setHandlerNames(map);
+      setHandlerNames(names);
+      setHandlerSignatures(sigs);
     }
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -83,6 +93,18 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
     loadData();
   }, [loadData]);
 
+  // Sync tab z URL (gdy użytkownik klika w PanelSwitch)
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    setActiveTab(t === 'scheduled' ? 'scheduled' : t === 'done' ? 'done' : 'pending');
+  }, [searchParams]);
+
+  function switchTab(tab: Tab) {
+    setActiveTab(tab);
+    const url = tab === 'pending' ? '/admin' : `/admin?tab=${tab}`;
+    window.history.replaceState(null, '', url);
+  }
+
   async function handleDeleteConfirmed() {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -97,19 +119,15 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
   }
 
   function handleSkip(id: string) {
-    // Czysto UI - nie zapisuje niczego do bazy, tylko chowa kartę z widoku
-    // do końca sesji przeglądania.
     setSkippedIds((prev) => new Set(prev).add(id));
   }
 
   const pendingCount = submissions.filter((s) => s.status === 'pending').length;
-  const scheduledCount = submissions.filter((s) => s.status === 'scheduled').length;
 
   let visibleSubmissions: Submission[];
   if (activeTab === 'pending') {
     // Pokazuje pending (poza pominiętymi w tej sesji) + scheduled/done jako
-    // przygaszone karty (sekcja 5.2 - "żeby wszyscy admini widzieli co już
-    // jest zaklepane").
+    // przygaszone karty (żeby wszyscy admini widzieli co już jest zaklepane).
     visibleSubmissions = submissions.filter(
       (s) => s.status !== 'pending' || !skippedIds.has(s.id)
     );
@@ -132,43 +150,7 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
 
   return (
     <div className="mx-auto max-w-5xl">
-      <OverdueBanner count={overdueCount} onViewClick={() => setActiveTab('scheduled')} />
-
-      <div className="tabs-scroll mb-5 flex gap-2 overflow-x-auto">
-        {(['pending', 'scheduled', 'done'] as Tab[]).map((tab) => {
-          const label =
-            tab === 'pending'
-              ? dictionary.adminQueue.tabPending
-              : tab === 'scheduled'
-                ? dictionary.adminQueue.tabScheduled
-                : dictionary.adminQueue.tabDone;
-          const count = tab === 'pending' ? pendingCount : tab === 'scheduled' ? scheduledCount : null;
-          const isActive = activeTab === tab;
-
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`touch-target shrink-0 rounded-pill border-2 px-4 py-2 text-sm font-semibold transition-colors ${
-                isActive
-                  ? 'border-bg-ink bg-accent text-white'
-                  : 'border-bg-ink/20 bg-white text-bg-ink/70 hover:bg-accent-soft'
-              }`}
-            >
-              {label}
-              {count !== null && count > 0 && (
-                <span
-                  className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${
-                    isActive ? 'bg-white/20' : 'bg-accent-soft text-accent'
-                  }`}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <OverdueBanner count={overdueCount} onViewClick={() => switchTab('scheduled')} />
 
       {isLoading ? (
         <div className="flex justify-center py-16">
@@ -199,8 +181,11 @@ export function AdminQueueClient({ initialOverdueCount }: AdminQueueClientProps)
               key={submission.id}
               submission={submission}
               handledByName={submission.handled_by ? handlerNames[submission.handled_by] : null}
+              handlerSignature={submission.handled_by ? handlerSignatures[submission.handled_by] || null : null}
               onOpen={setEditingSubmission}
               showCopyButton={activeTab === 'scheduled'}
+              showDeleteButton={activeTab === 'done'}
+              onDelete={() => setDeleteTarget(submission)}
               onCopied={loadData}
             />
           ))}

@@ -1,7 +1,7 @@
 // app/master/layout.tsx
+import { Suspense } from 'react';
 import Link from 'next/link';
-import { Settings } from 'lucide-react';
-import { dictionary, splitBrandName } from '@/lib/dictionary';
+import { splitBrandName } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/server';
 import { LogoutButton } from '@/components/admin/LogoutButton';
 import { PanelSwitch } from '@/components/admin/PanelSwitch';
@@ -35,15 +35,17 @@ export default async function MasterLayout({ children }: { children: React.React
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-page">
       <header className="flex shrink-0 items-center justify-between border-b-2 border-bg-ink bg-white px-4 py-3">
-        <div className="flex items-center gap-4">
-          <Link href="/admin" className="font-display text-lg font-bold text-bg-ink">
+        <div className="flex min-w-0 items-center gap-3 overflow-hidden">
+          <Link href="/" className="shrink-0 font-display text-lg font-bold text-bg-ink">
             {baseName}
             <span className="text-accent">{accent}</span>
           </Link>
-          <PanelSwitch activePath="/master" />
+          <Suspense fallback={null}>
+            <PanelSwitch isOperator={true} />
+          </Suspense>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {displayName && (
             <span
               className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-bg-ink bg-accent-soft text-sm font-bold text-accent"
@@ -52,13 +54,6 @@ export default async function MasterLayout({ children }: { children: React.React
               {initials}
             </span>
           )}
-          <Link
-            href="/admin/settings"
-            className="touch-target flex items-center justify-center rounded-full text-bg-ink/60 hover:bg-black/5 hover:text-bg-ink"
-            title={dictionary.adminQueue.settingsCta}
-          >
-            <Settings size={20} />
-          </Link>
           <LogoutButton />
         </div>
       </header>

@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
 import { asUntyped } from '@/lib/supabase/untyped';
@@ -14,8 +14,11 @@ import { Card } from '@/components/ui/Card';
 interface SubmissionListRowProps {
   submission: Submission;
   handledByName?: string | null;
+  handlerSignature?: string | null;
   onOpen: (submission: Submission) => void;
   showCopyButton: boolean;
+  showDeleteButton?: boolean;
+  onDelete?: () => void;
   onCopied?: () => void;
 }
 
@@ -32,8 +35,11 @@ function previewSnippet(rawComment: string, submission: Submission): string {
 export function SubmissionListRow({
   submission,
   handledByName,
+  handlerSignature,
   onOpen,
   showCopyButton,
+  showDeleteButton = false,
+  onDelete,
   onCopied,
 }: SubmissionListRowProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -75,13 +81,18 @@ export function SubmissionListRow({
     await navigator.clipboard.writeText(finalMessage);
 
     // Kopiujący "obsługuje" zgłoszenie teraz - podpis pochodzi od osoby
-    // wykonującej akcję kopiowania, nie od autora treści (sekcja 5.4).
+    // wykonującej akcję kopiowania, nie od autora treści.
     await asUntyped(supabase)
       .from('submissions')
       .update({ status: 'done', handled_by: session?.user.id })
       .eq('id', submission.id);
 
     onCopied?.();
+  }
+
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    onDelete?.();
   }
 
   const snippet = previewSnippet(submission.comment_body, submission);
@@ -102,21 +113,37 @@ export function SubmissionListRow({
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-bg-ink">{snippet || '—'}</p>
-        <p className="truncate text-xs text-bg-ink/50">
-          {submission.scheduled_for && `${formatDateTime(submission.scheduled_for)} · `}
-          {handledByName && dictionary.adminQueue.statusDoneBy(handledByName)}
-        </p>
+        <div className="flex flex-col gap-0.5">
+          <p className="truncate text-xs text-bg-ink/50">
+            {submission.scheduled_for && `${formatDateTime(submission.scheduled_for)} · `}
+            {handledByName && dictionary.adminQueue.statusDoneBy(handledByName)}
+          </p>
+          {handlerSignature && (
+            <p className="truncate text-xs text-bg-ink/40 italic">{handlerSignature}</p>
+          )}
+        </div>
       </div>
 
-      {showCopyButton && (
-        <button
-          onClick={handleCopy}
-          className="touch-target flex shrink-0 items-center gap-1.5 rounded-pill border-2 border-bg-ink bg-accent-soft px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent-soft/70"
-        >
-          <Copy size={14} />
-          {dictionary.editor.copyCta}
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {showCopyButton && (
+          <button
+            onClick={handleCopy}
+            className="touch-target flex items-center gap-1.5 rounded-pill border-2 border-bg-ink bg-accent-soft px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent-soft/70"
+          >
+            <Copy size={14} />
+            {dictionary.editor.copyCta}
+          </button>
+        )}
+        {showDeleteButton && (
+          <button
+            onClick={handleDeleteClick}
+            className="touch-target flex items-center justify-center rounded-pill border-2 border-danger-border bg-danger-bg px-2.5 py-1.5 text-sm font-semibold text-danger-fg hover:bg-danger-border/30"
+            title={dictionary.adminQueue.deleteCta}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
     </Card>
   );
 }
