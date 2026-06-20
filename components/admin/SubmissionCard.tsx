@@ -1,32 +1,43 @@
 // components/admin/SubmissionCard.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { User, Link2, Check, Calendar, Trash2, SkipForward } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { User, Link2, MoreHorizontal, Trash2, SkipForward, Lock } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
-import { formatRelativeTime, formatDateTime } from '@/lib/format-time';
+import { asUntyped } from '@/lib/supabase/untyped';
+import { formatRelativeTime } from '@/lib/format-time';
 import type { Submission } from '@/lib/database.types';
 import { Card } from '@/components/ui/Card';
 
 interface SubmissionCardProps {
   submission: Submission;
   handledByName?: string | null;
+  reservedByName?: string | null;
+  myUserId?: string;
   onOpen: (submission: Submission) => void;
   onSkip: (id: string) => void;
   onDelete: (submission: Submission) => void;
-  interactive: boolean; // false dla scheduled/done w widoku kolejki
+  onReserve: (id: string) => void;
+  onUnreserve: (id: string) => void;
+  interactive: boolean;
 }
 
 export function SubmissionCard({
   submission,
   handledByName,
+  reservedByName,
+  myUserId,
   onOpen,
   onSkip,
   onDelete,
+  onReserve,
+  onUnreserve,
   interactive,
 }: SubmissionCardProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,56 +48,39 @@ export function SubmissionCard({
       .then(({ data }) => {
         if (!cancelled && data) setSignedUrl(data.signedUrl);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [submission.image_path]);
 
-  const isOverlayed = submission.status !== 'pending';
+  // Zamknij dropdown przy kliknięciu na zewnątrz
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
+
+  const isReserved = submission.status === 'reserved';
+  const isMyReservation = isReserved && submission.reserved_by === myUserId;
 
   return (
     <Card
-      className={`relative overflow-hidden transition-opacity ${
-        isOverlayed ? 'opacity-75' : ''
-      } ${interactive && !isOverlayed ? 'cursor-pointer hover:shadow-chunky-sm' : ''}`}
-      onClick={() => interactive && !isOverlayed && onOpen(submission)}
+      className={`relative overflow-hidden transition-all duration-200 ${
+        isReserved && !isMyReservation ? 'opacity-80' : ''
+      } ${interactive && !isReserved ? 'cursor-pointer hover:shadow-chunky-sm' : ''}`}
+      onClick={() => interactive && !isReserved && onOpen(submission)}
     >
-      {isOverlayed && (
-        <div
-          className={`absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 ${
-            submission.status === 'done' ? 'bg-bubble/90' : 'bg-scheduled/90'
-          }`}
-        >
-          {submission.status === 'done' ? (
-            <>
-              <Check size={28} className="text-whatsapp" />
-              <span className="font-display font-semibold text-bg-ink">
-                {dictionary.adminQueue.statusDoneLabel}
-              </span>
-              {handledByName && (
-                <span className="text-sm text-bg-ink/70">
-                  {dictionary.adminQueue.statusDoneBy(handledByName)}
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <Calendar size={28} className="text-bg-ink/70" />
-              <span className="font-display font-semibold text-bg-ink">
-                {dictionary.adminQueue.statusScheduledLabel}
-              </span>
-              {submission.scheduled_for && (
-                <span className="text-sm text-bg-ink/70">
-                  {formatDateTime(submission.scheduled_for)}
-                </span>
-              )}
-            </>
-          )}
+      {/* Pasek rezerwacji */}
+      {isReserved && (
+        <div className="flex items-center gap-1.5 bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent">
+          <Lock size={12} />
+          {reservedByName && dictionary.adminQueue.reservedBy(reservedByName)}
         </div>
       )}
 
       <div className="flex flex-col gap-3 p-4">
-        {/* Pełen screenshot bez cropowania — object-contain */}
         <div className="w-full overflow-hidden border-2 border-bg-ink/5 bg-bg-ink/5">
           {signedUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -119,30 +113,53 @@ export function SubmissionCard({
           </a>
         )}
 
-        {!isOverlayed && (
-          <div className="flex gap-2 pt-1">
+        {/* Akcje */}
+        <div className="flex items-center gap-2 pt-1">
+          {isMyReservation ? (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(submission);
-              }}
-              className="touch-target flex flex-1 items-center justify-center gap-1.5 border-2 border-danger-border bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-fg hover:bg-danger-border/30"
-            >
-              <Trash2 size={15} />
-              {dictionary.adminQueue.deleteCta}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSkip(submission.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onUnreserve(submission.id); }}
               className="touch-target flex flex-1 items-center justify-center gap-1.5 border-2 border-bg-ink bg-white px-3 py-2 text-sm font-semibold text-bg-ink hover:bg-black/5"
             >
-              <SkipForward size={15} />
-              {dictionary.adminQueue.skipCta}
+              {dictionary.adminQueue.unreserveCta}
             </button>
+          ) : !isReserved && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onReserve(submission.id); }}
+              className="touch-target flex flex-1 items-center justify-center gap-1.5 border-2 border-bg-ink bg-accent-soft px-3 py-2 text-sm font-semibold text-accent hover:bg-accent-soft/70"
+            >
+              <Lock size={14} />
+              {dictionary.adminQueue.reserveCta}
+            </button>
+          )}
+
+          {/* Dropdown trzy kropki */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setDropdownOpen((v) => !v); }}
+              className="touch-target flex items-center justify-center border-2 border-bg-ink bg-white px-2 text-bg-ink hover:bg-black/5"
+            >
+              <MoreHorizontal size={18} />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 bottom-full z-20 mb-1 w-40 border-2 border-bg-ink bg-white p-1 shadow-chunky" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => { onSkip(submission.id); setDropdownOpen(false); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-bg-ink hover:bg-accent-soft"
+                >
+                  <SkipForward size={14} />
+                  {dictionary.adminQueue.skipCta}
+                </button>
+                <button
+                  onClick={() => { onDelete(submission); setDropdownOpen(false); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger-fg hover:bg-danger-bg"
+                >
+                  <Trash2 size={14} />
+                  {dictionary.adminQueue.deleteCta}
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </Card>
   );

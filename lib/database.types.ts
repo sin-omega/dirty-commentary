@@ -8,13 +8,14 @@
 // Update zamiast intersection types z Partial<>) - intersection types
 // potrafią psuć wnioskowanie przeciążeń insert/upsert/update w postgrest-js.
 
-export type SubmissionStatus = 'pending' | 'scheduled' | 'done';
+export type SubmissionStatus = 'pending' | 'reserved' | 'scheduled' | 'done';
 
 export interface AdminProfile {
   id: string;
   username: string;
   display_name: string;
   signature: string;
+  sender_suffix: string;
   is_operator: boolean;
   created_at: string;
 }
@@ -75,6 +76,7 @@ export interface Submission {
   status: SubmissionStatus;
   comment_body: string;
   handled_by: string | null;
+  reserved_by: string | null;
   scheduled_for: string | null;
   created_at: string;
   updated_at: string;

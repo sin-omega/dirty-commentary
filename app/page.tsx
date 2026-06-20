@@ -1,9 +1,10 @@
 // app/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageCircle, LogIn } from 'lucide-react';
 import { dictionary, splitBrandName } from '@/lib/dictionary';
+import { createClient } from '@/lib/supabase/client';
 import { SubmissionForm } from '@/components/public/SubmissionForm';
 import { LoginModal } from '@/components/admin/LoginModal';
 
@@ -11,6 +12,22 @@ export default function HomePage() {
   const whatsappUrl = process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL;
   const { baseName, accent } = splitBrandName();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setIsLoggedIn(!!data.user);
+    });
+  }, []);
+
+  function handleLoginClick() {
+    if (isLoggedIn) {
+      window.location.href = '/admin';
+    } else {
+      setLoginModalOpen(true);
+    }
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-bg-page px-4 py-6 sm:py-10">
@@ -42,7 +59,7 @@ export default function HomePage() {
           ) : null}
 
           <button
-            onClick={() => setLoginModalOpen(true)}
+            onClick={handleLoginClick}
             className="inline-flex items-center gap-1.5 text-xs text-bg-ink/50 hover:text-bg-ink/80"
           >
             <LogIn size={13} />

@@ -1,8 +1,8 @@
 // app/admin/settings/page.tsx
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/server';
+import { asUntyped } from '@/lib/supabase/untyped';
 import { SettingsForm } from '@/components/admin/SettingsForm';
 
 export default async function SettingsPage() {
@@ -11,37 +11,30 @@ export default async function SettingsPage() {
 
   if (!user) redirect('/admin/login');
 
-  let profile: { username: string; display_name: string; signature: string; is_operator: boolean } | null = null;
+  let rawData: Record<string, unknown> | null = null;
   try {
-    const result = await supabase
+    const result = await asUntyped(supabase)
       .from('admin_profiles')
-      .select('username, display_name, signature, is_operator')
+      .select('username, display_name, signature, is_operator, sender_suffix')
       .eq('id', user.id)
-      .single<{ username: string; display_name: string; signature: string; is_operator: boolean }>();
-    profile = result.data;
+      .single();
+    rawData = result.data;
   } catch {
     redirect('/admin/login');
   }
 
-  if (!profile) redirect('/admin/login');
-
-  // Operator wracający ze settings — trafia na /master, nie na /admin
-  const backHref = profile.is_operator ? '/master' : '/admin';
+  if (!rawData) redirect('/admin/login');
 
   return (
     <div>
-      <div className="mx-auto mb-5 max-w-lg">
-        <Link href={backHref} className="text-sm text-bg-ink/50 hover:text-bg-ink/80">
-          {dictionary.settings.backCta}
-        </Link>
-      </div>
       <h1 className="mb-5 text-center font-display text-2xl font-bold text-bg-ink">
         {dictionary.settings.title}
       </h1>
       <SettingsForm
-        username={profile.username}
-        displayName={profile.display_name}
-        initialSignature={profile.signature}
+        username={String(rawData.username ?? '')}
+        displayName={String(rawData.display_name ?? '')}
+        initialSignature={String(rawData.signature ?? '')}
+        initialSenderSuffix={String(rawData.sender_suffix ?? '')}
         userId={user.id}
       />
     </div>

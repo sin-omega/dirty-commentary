@@ -14,11 +14,13 @@ interface SettingsFormProps {
   username: string;
   displayName: string;
   initialSignature: string;
+  initialSenderSuffix: string;
   userId: string;
 }
 
-export function SettingsForm({ username, displayName, initialSignature, userId }: SettingsFormProps) {
+export function SettingsForm({ username, displayName, initialSignature, initialSenderSuffix, userId }: SettingsFormProps) {
   const [signature, setSignature] = useState(initialSignature);
+  const [senderSuffix, setSenderSuffix] = useState(initialSenderSuffix);
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export function SettingsForm({ username, displayName, initialSignature, userId }
     const supabase = createClient();
     const { error: updateError } = await asUntyped(supabase)
       .from('admin_profiles')
-      .update({ signature })
+      .update({ signature, sender_suffix: senderSuffix })
       .eq('id', userId);
 
     setIsSaving(false);
@@ -42,8 +44,9 @@ export function SettingsForm({ username, displayName, initialSignature, userId }
     setShowSavedToast(true);
   }
 
+  const previewBody = `treść komentarza...\n\n${senderSuffix.replace('%sender%', dictionary.settings.previewSampleSender)}`;
   const previewHtml = renderWhatsAppMarkdownToHtml(
-    buildFinalMessage(dictionary.settings.previewSamplePlaceholder, {
+    buildFinalMessage(previewBody, {
       sender: dictionary.settings.previewSampleSender,
       signature,
     })
@@ -81,24 +84,43 @@ export function SettingsForm({ username, displayName, initialSignature, userId }
           value={signature}
           onChange={(e) => setSignature(e.target.value)}
           placeholder={dictionary.settings.signaturePlaceholder}
-          className="w-full resize-none rounded-card border-2 border-bg-ink/20 p-3 font-mono text-sm outline-none focus:border-accent"
+          className="w-full resize-none border-2 border-bg-ink/20 p-3 font-mono text-sm outline-none focus:border-accent"
         />
         <p className="mt-1.5 text-xs text-bg-ink/50">{dictionary.settings.signatureHint}</p>
-
-        <div className="mt-4">
-          <p className="mb-1.5 text-sm font-semibold text-bg-ink/70">{dictionary.settings.previewLabel}</p>
-          <div
-            className="wa-preview rounded-card-lg rounded-bl-md border-2 border-bubble-border bg-bubble p-4 text-sm text-bg-ink"
-            dangerouslySetInnerHTML={{ __html: previewHtml }}
-          />
-        </div>
-
-        {error && <p className="mt-3 text-sm text-danger-fg">{error}</p>}
-
-        <Button variant="primary" className="mt-4 w-full" isLoading={isSaving} onClick={handleSave}>
-          {isSaving ? dictionary.settings.savingState : dictionary.settings.saveCta}
-        </Button>
       </Card>
+
+      <Card className="p-6">
+        <h2 className="mb-4 font-display text-lg font-bold text-bg-ink">
+          {dictionary.settings.senderSuffixSection}
+        </h2>
+
+        <label htmlFor="senderSuffix" className="mb-1.5 block text-sm font-semibold text-bg-ink">
+          {dictionary.settings.senderSuffixLabel}
+        </label>
+        <input
+          id="senderSuffix"
+          type="text"
+          value={senderSuffix}
+          onChange={(e) => setSenderSuffix(e.target.value)}
+          placeholder={dictionary.settings.senderSuffixPlaceholder}
+          className="w-full border-2 border-bg-ink/20 px-3 py-2.5 text-sm outline-none focus:border-accent"
+        />
+        <p className="mt-1.5 text-xs text-bg-ink/50">{dictionary.settings.senderSuffixHint}</p>
+      </Card>
+
+      <Card className="p-6">
+        <p className="mb-1.5 text-sm font-semibold text-bg-ink/70">{dictionary.settings.previewLabel}</p>
+        <div
+          className="wa-preview border-2 border-bubble-border bg-bubble p-4 text-sm text-bg-ink"
+          dangerouslySetInnerHTML={{ __html: previewHtml }}
+        />
+      </Card>
+
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
+
+      <Button variant="primary" className="w-full" isLoading={isSaving} onClick={handleSave}>
+        {isSaving ? dictionary.settings.savingState : dictionary.settings.saveCta}
+      </Button>
 
       <Toast message={dictionary.settings.savedToast} show={showSavedToast} onHide={() => setShowSavedToast(false)} />
     </div>

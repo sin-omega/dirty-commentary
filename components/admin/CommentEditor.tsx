@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, AlertTriangle, Maximize2, Minimize2, Image } from 'lucide-react';
+import { X, AlertTriangle, Maximize2, Minimize2, Image, Check } from 'lucide-react';
 import { dictionary } from '@/lib/dictionary';
 import { createClient } from '@/lib/supabase/client';
 import { asUntyped } from '@/lib/supabase/untyped';
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { EditorToolbar } from '@/components/admin/EditorToolbar';
 import { SchedulePicker } from '@/components/admin/SchedulePicker';
 import { Toast } from '@/components/ui/Toast';
+
+type EditorMode = 'plain' | 'markdown';
 
 interface CommentEditorProps {
   submission: Submission;
@@ -28,21 +30,15 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  const [body, setBody] = useState(() => {
-    let text = submission.comment_body || '';
-    const sig = initialSignature?.trim();
-    if (sig && text.trim() && !text.trimEnd().endsWith(sig)) {
-      text = `${text}\n\n${sig}`;
-    } else if (sig && !text.trim()) {
-      text = sig;
-    }
-    return text;
-  });
+  const [body, setBody] = useState(submission.comment_body || '');
+  const [mode, setMode] = useState<EditorMode>('markdown');
   const [schedulePickerOpen, setSchedulePickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
   const [showImageCopiedToast, setShowImageCopiedToast] = useState(false);
   const [showScheduledToast, setShowScheduledToast] = useState(false);
+  const [showDoneToast, setShowDoneToast] = useState(false);
+  const [showUndoToast, setShowUndoToast] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -50,10 +46,8 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   const usesChannelVariable = body.includes('%channel_link%');
   const showMissingChannelWarning = usesChannelVariable && !hasChannelLink;
 
-  // Renderuj markdown na żywo — backdrop zawsze pokazuje sformatowany tekst
   const previewHtml = renderWhatsAppMarkdownToHtml(body);
 
-  // Pobierz signed URL dla obrazu zgłoszenia
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
@@ -66,7 +60,6 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
     return () => { cancelled = true; };
   }, [submission.image_path]);
 
-  // Sync scroll textarea ↔ backdrop
   const handleScroll = useCallback(() => {
     if (textareaRef.current && backdropRef.current) {
       backdropRef.current.scrollTop = textareaRef.current.scrollTop;
@@ -140,27 +133,9 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   async function handleCopyText() {
     setIsSaving(true);
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
     await navigator.clipboard.writeText(body);
-
-    const { error } = await asUntyped(supabase)
-      .from('submissions')
-      .update({
-        comment_body: body,
-        status: 'done',
-        handled_by: session?.user.id,
-      })
-      .eq('id', submission.id);
-
     setIsSaving(false);
-
-    if (!error) {
-      setShowCopiedToast(true);
-      onSaved();
-      router.refresh();
-      setTimeout(onClose, 900);
-    }
+    setShowCopiedToast(true);
   }
 
   async function handleCopyImage() {
@@ -174,13 +149,58 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
       ]);
       setShowImageCopiedToast(true);
     } catch {
-      // Fallback: nic nie kopiuj
+      // fallback: nothing
+    }
+  }
+
+  async function handleMarkDone() {
+    setIsSaving(true);
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const { error } = await asUntyped(supabase)
+      .from('submissions')
+      .update({
+        comment_body: body,
+        status: 'done',
+        handled_by: session?.user.id,
+      })
+      .eq('id', submission.id);
+
+    setIsSaving(false);
+
+    if (!error) {
+      setShowDoneToast(true);
+      onSaved();
+      router.refresh();
+      setTimeout(onClose, 900);
+    }
+  }
+
+  async function handleUndoDone() {
+    setIsSaving(true);
+    const supabase = createClient();
+
+    const { error } = await asUntyped(supabase)
+      .from('submissions')
+      .update({
+        comment_body: body,
+        status: 'pending',
+        handled_by: null,
+      })
+      .eq('id', submission.id);
+
+    setIsSaving(false);
+
+    if (!error) {
+      setShowUndoToast(true);
+      onSaved();
+      router.refresh();
     }
   }
 
   const isEmpty = body.trim().length === 0;
 
-  // Wrapper — fullscreen vs modal
   const wrapperClass = isFullscreen
     ? 'fixed inset-0 z-50 flex flex-col bg-white'
     : 'fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center';
@@ -188,6 +208,11 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
   const containerClass = isFullscreen
     ? 'flex h-full flex-col bg-white'
     : 'flex h-full w-full flex-col bg-white sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-card sm:border-2 sm:border-bg-ink sm:shadow-chunky';
+
+  const modeCls = (active: boolean) =>
+    `px-3 py-1 text-xs font-semibold transition-colors ${
+      active ? 'bg-bg-ink text-white' : 'text-bg-ink/50 hover:text-bg-ink'
+    }`;
 
   return (
     <div className={wrapperClass}>
@@ -235,9 +260,9 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
           </div>
         </div>
 
-        {/* Toolbar */}
+        {/* Toolbar + mode switch */}
         {!readOnly && (
-          <div className="shrink-0 border-b-2 border-bg-ink/5 px-4 py-2">
+          <div className="flex shrink-0 items-center gap-3 border-b-2 border-bg-ink/5 px-4 py-2">
             <EditorToolbar
               onWrapFormat={handleWrapFormat}
               onMonospaceBlock={handleMonospaceBlock}
@@ -245,13 +270,20 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
               onInsertVariable={handleInsertVariable}
               hasChannelLink={hasChannelLink}
             />
+            <div className="flex shrink-0 gap-0.5 bg-bg-ink/5 p-0.5">
+              <button type="button" onClick={() => setMode('plain')} className={modeCls(mode === 'plain')}>
+                {dictionary.editor.modePlain}
+              </button>
+              <button type="button" onClick={() => setMode('markdown')} className={modeCls(mode === 'markdown')}>
+                {dictionary.editor.modeMarkdown}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Scrollable body — WYSIWYG edytor + obraz */}
+        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
           <div className={`flex gap-4 p-4 ${isFullscreen ? 'flex-row' : 'flex-col lg:flex-row'}`}>
-            {/* WYSIWYG edytor — textarea + backdrop overlay */}
             <div className={`flex min-w-0 flex-1 flex-col gap-3 ${isFullscreen ? '' : 'lg:flex-none lg:w-1/2'}`}>
               {showMissingChannelWarning && (
                 <p className="flex items-center gap-1.5 border-2 border-scheduled-border bg-scheduled px-3 py-1.5 text-sm text-bg-ink/70">
@@ -260,82 +292,75 @@ export function CommentEditor({ submission, signature: initialSignature, onClose
                 </p>
               )}
 
-              <div className="wysiwyg-container flex-1">
-                <div
-                  ref={backdropRef}
-                  className="wa-preview wysiwyg-backdrop"
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
-                />
+              {mode === 'markdown' ? (
+                <div className="wysiwyg-container flex-1">
+                  <div ref={backdropRef} className="wa-preview wysiwyg-backdrop" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                  <textarea
+                    ref={textareaRef}
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    onScroll={handleScroll}
+                    placeholder={dictionary.editor.textareaPlaceholder}
+                    readOnly={readOnly}
+                    disabled={readOnly}
+                    className="wysiwyg-textarea"
+                  />
+                </div>
+              ) : (
                 <textarea
                   ref={textareaRef}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  onScroll={handleScroll}
                   placeholder={dictionary.editor.textareaPlaceholder}
                   readOnly={readOnly}
                   disabled={readOnly}
-                  className="wysiwyg-textarea"
+                  className="w-full flex-1 resize-none border-2 border-bg-ink/20 p-3 font-mono text-sm outline-none focus:border-accent disabled:opacity-60"
                 />
-              </div>
+              )}
             </div>
 
-            {/* Obraz zgłoszenia — pełen screenshot */}
             {imageUrl && (
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-2 border-bg-ink/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl}
-                  alt={dictionary.editor.imageAlt}
-                  className="w-full object-contain"
-                />
+                <img src={imageUrl} alt={dictionary.editor.imageAlt} className="w-full object-contain" />
               </div>
             )}
           </div>
         </div>
 
-        {/* Footer — 3 przyciski: zaplanuj / kopiuj tekst / kopiuj obraz */}
+        {/* Footer */}
         {!readOnly && (
           <div className="flex shrink-0 flex-col gap-2 border-t-2 border-bg-ink/10 p-4 sm:flex-row">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={isEmpty || isSaving}
-              onClick={() => setSchedulePickerOpen(true)}
-            >
+            <Button variant="secondary" className="flex-1" disabled={isEmpty || isSaving} onClick={() => setSchedulePickerOpen(true)}>
               {dictionary.editor.scheduleCta}
             </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              disabled={isEmpty}
-              isLoading={isSaving}
-              onClick={handleCopyText}
-            >
+            <Button variant="secondary" className="flex-1" disabled={isEmpty} onClick={handleCopyText}>
               {dictionary.editor.copyCta}
             </Button>
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={!imageUrl}
-              onClick={handleCopyImage}
-            >
-              <Image size={16} />
+            <Button variant="secondary" className="flex-1" disabled={!imageUrl} onClick={handleCopyImage}>
+              <Image size={16} aria-hidden="true" />
               {dictionary.editor.copyImageCta}
             </Button>
+            {submission.status !== 'done' ? (
+              <Button variant="primary" className="flex-1" disabled={isEmpty || isSaving} isLoading={isSaving} onClick={handleMarkDone}>
+                <Check size={16} />
+                {dictionary.editor.markDoneCta}
+              </Button>
+            ) : (
+              <Button variant="secondary" className="flex-1" disabled={isSaving} isLoading={isSaving} onClick={handleUndoDone}>
+                {dictionary.editor.undoDoneCta}
+              </Button>
+            )}
           </div>
         )}
       </div>
 
-      <SchedulePicker
-        open={schedulePickerOpen}
-        onConfirm={handleSchedule}
-        onCancel={() => setSchedulePickerOpen(false)}
-        isSaving={isSaving}
-      />
-
+      <SchedulePicker open={schedulePickerOpen} onConfirm={handleSchedule} onCancel={() => setSchedulePickerOpen(false)} isSaving={isSaving} />
       <Toast message={dictionary.editor.copiedToast} show={showCopiedToast} onHide={() => setShowCopiedToast(false)} />
       <Toast message={dictionary.editor.imageCopiedToast} show={showImageCopiedToast} onHide={() => setShowImageCopiedToast(false)} />
       <Toast message={dictionary.editor.scheduleSavedToast} show={showScheduledToast} onHide={() => setShowScheduledToast(false)} />
+      <Toast message={dictionary.editor.markDoneToast} show={showDoneToast} onHide={() => setShowDoneToast(false)} />
+      <Toast message={dictionary.editor.undoDoneToast} show={showUndoToast} onHide={() => setShowUndoToast(false)} />
     </div>
   );
 }

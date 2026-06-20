@@ -4,9 +4,6 @@
 // hardcodowany w komponencie. Wszystkie napisy żyją tutaj.
 // Komponenty importują: import { dictionary } from '@/lib/dictionary'
 // i używają np. dictionary.public.submitCta — nigdy literału stringa w JSX.
-//
-// Zmiana nazwy marki, tonu komunikatów czy jakiegokolwiek tekstu UI to
-// edycja jednego pola w tym pliku, nie szukanie po całym repo.
 
 export const dictionary = {
   brand: {
@@ -51,7 +48,6 @@ export const dictionary = {
     submittingState: 'logowanie...',
     noRegisterHint: 'konta tworzone są przez zaproszenie',
     genericError: 'nieprawidłowy login lub hasło',
-    backToPublic: '← wróć do strony głównej',
   },
 
   activate: {
@@ -92,14 +88,24 @@ export const dictionary = {
     tabDoneShort: 'omów.',
     skipCta: 'pomiń',
     deleteCta: 'usuń',
+    markDoneCta: 'oznacz jako omówione',
+    undoDoneCta: 'cofnij omówienie',
+    reserveCta: 'zarezerwuj',
+    unreserveCta: 'anuluj rezerwację',
+    reservedBy: (name: string) => `zarezerwowane dla ${name}`,
     deleteConfirmTitle: 'usunąć to zgłoszenie?',
     deleteConfirmBody: 'tej operacji nie można odwrócić',
     deleteConfirmCta: 'tak, usuń',
     deleteCancelCta: 'nie, wróć',
+    bulkDeleteCta: 'usuń zaznaczone',
+    bulkSelectCta: 'zaznacz wszystko',
+    bulkDeselectCta: 'odznacz wszystko',
+    bulkDeleteConfirmTitle: 'usunąć zaznaczone elementy?',
+    bulkDeleteConfirmBody: (n: number) => `${n} elementów zostanie trwale usuniętych`,
     statusDoneLabel: 'omówione',
     statusDoneBy: (name: string) => `przez ${name}`,
     statusScheduledLabel: 'zaplanowane',
-    emptyPending: 'kolejka jest pusta — wszystkie zgłoszenia obsłużone 🎉',
+    emptyPending: 'kolejka jest pusta — wszystkie zgłoszenia obsłużone',
     emptyScheduled: 'nic nie jest zaplanowane — kolejka czeka w drugim tabie',
     emptyDone: 'jeszcze nic nie zostało omówione',
     bannerOverdue: (n: number) =>
@@ -112,7 +118,6 @@ export const dictionary = {
     relativeMinutesAgo: (n: number) => `${n} min temu`,
     relativeHoursAgo: (n: number) => `${n} godz. temu`,
     relativeDaysAgo: (n: number) => `${n} dni temu`,
-    nextCta: 'dalej',
     logoutCta: 'wyloguj',
     settingsCta: 'ustawienia',
   },
@@ -135,8 +140,9 @@ export const dictionary = {
     channelVarLabel: '%channel_link%',
     channelVarHint: 'link z kontekstu zgłoszenia (jeśli podany)',
     textareaPlaceholder: 'napisz swój komentarz tutaj... użyj *bold*, _italic_, ~strike~',
+    modePlain: 'plain',
+    modeMarkdown: 'markdown',
     previewLabel: 'podgląd',
-
     previewSignatureHint: 'podpis dodawany automatycznie z ustawień konta',
     settingsLinkCta: 'zmień w ustawieniach',
     missingChannelWarning: 'to zgłoszenie nie ma linku — %channel_link% zostanie puste',
@@ -151,12 +157,14 @@ export const dictionary = {
     scheduleSavedToast: 'zaplanowano',
     copyCta: 'kopiuj tekst',
     copyImageCta: 'kopiuj obraz',
+    markDoneCta: 'oznacz jako omówione',
+    markDoneToast: 'oznaczone jako omówione',
+    undoDoneCta: 'cofnij omówienie',
+    undoDoneToast: 'cofnięto',
     copiedToast: 'skopiowano',
     imageCopiedToast: 'obraz skopiowany',
     fullscreenCta: 'pełny ekran',
     exitFullscreenCta: 'zamknij pełny ekran',
-    signatureEditLabel: 'podpis',
-    saveSignatureCta: 'zapisz do profilu',
     emptyCommentError: 'wpisz treść komentarza',
     savingState: 'zapisywanie...',
     senderLabel: 'od',
@@ -166,7 +174,6 @@ export const dictionary = {
 
   settings: {
     title: 'ustawienia',
-    backCta: '← wróć do panelu',
     accountSection: 'twoje konto',
     loginLabel: 'login',
     displayNameLabel: 'wyświetlana nazwa',
@@ -174,10 +181,14 @@ export const dictionary = {
     signatureLabel: 'twój podpis',
     signatureHint: 'doklejany automatycznie na końcu każdego komentarza przy kopiowaniu',
     signaturePlaceholder: 'np. *— Kasia*',
+    senderSuffixSection: 'sufiks nadawcy',
+    senderSuffixLabel: 'sufiks dodawany na końcu wiadomości',
+    senderSuffixHint: 'użyj %sender% jako placeholder na ksywkę wysyłającego, np. (screen od %sender%)',
+    senderSuffixPlaceholder: '(screen od %sender%)',
     previewLabel: 'podgląd',
     previewSamplePlaceholder: 'treść twojego komentarza tutaj...',
     previewSampleSender: 'anka92',
-    saveCta: 'zapisz podpis',
+    saveCta: 'zapisz',
     savingState: 'zapisywanie...',
     savedToast: 'zapisano',
     errorToast: 'nie udało się zapisać',
@@ -185,11 +196,14 @@ export const dictionary = {
 
   master: {
     title: 'panel operatora',
-    backCta: '← wróć do panelu',
     tabQueue: 'kolejka',
     tabMaster: 'operator',
     tabSettings: 'ustawienia',
     deleteTokenCta: 'usuń',
+    deleteConfirmTitle: 'usunąć?',
+    deleteConfirmBody: 'tej operacji nie można odwrócić',
+    deleteConfirmCta: 'tak, usuń',
+    deleteCancelCta: 'nie, wróć',
     deleteTokenConfirmTitle: 'usunąć ten link?',
     deleteTokenConfirmBody: 'link przestanie być ważny natychmiast',
     deleteTokenConfirmCta: 'tak, usuń',
@@ -232,12 +246,6 @@ export const dictionary = {
 
 export type Dictionary = typeof dictionary;
 
-/**
- * Dzieli dictionary.brand.name na część bazową i akcentowaną (titleAccent),
- * żeby komponenty mogły wyrenderować nazwę z kolorowym fragmentem bez
- * hardcodowania samej nazwy marki w JSX. Jeśli titleAccent nie jest
- * sufiksem name, całość trafia do baseName, a accent jest pusty.
- */
 export function splitBrandName(): { baseName: string; accent: string } {
   const { name, titleAccent } = dictionary.brand;
   if (titleAccent && name.endsWith(titleAccent)) {
