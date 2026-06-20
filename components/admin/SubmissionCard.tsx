@@ -86,12 +86,15 @@ export function SubmissionCard({
       )}
 
       <div className="flex flex-col gap-3 p-4">
-        <div className="aspect-video w-full overflow-hidden rounded-card bg-bg-ink/5">
+        {/* Pełen screenshot bez cropowania — object-contain */}
+        <div className="w-full overflow-hidden border-2 border-bg-ink/5 bg-bg-ink/5">
           {signedUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={signedUrl} alt="" className="h-full w-full object-cover" />
+            <img src={signedUrl} alt="" className="w-full object-contain" />
           ) : (
-            <div className="h-full w-full animate-pulse bg-bg-ink/10" />
+            <div className="flex aspect-video w-full items-center justify-center bg-bg-ink/10">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-bg-ink border-t-transparent" />
+            </div>
           )}
         </div>
 
@@ -123,7 +126,7 @@ export function SubmissionCard({
                 e.stopPropagation();
                 onDelete(submission);
               }}
-              className="touch-target flex flex-1 items-center justify-center gap-1.5 rounded-pill border-2 border-danger-border bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-fg hover:bg-danger-border/30"
+              className="touch-target flex flex-1 items-center justify-center gap-1.5 border-2 border-danger-border bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-fg hover:bg-danger-border/30"
             >
               <Trash2 size={15} />
               {dictionary.adminQueue.deleteCta}
@@ -133,7 +136,7 @@ export function SubmissionCard({
                 e.stopPropagation();
                 onSkip(submission.id);
               }}
-              className="touch-target flex flex-1 items-center justify-center gap-1.5 rounded-pill border-2 border-bg-ink bg-white px-3 py-2 text-sm font-semibold text-bg-ink hover:bg-black/5"
+              className="touch-target flex flex-1 items-center justify-center gap-1.5 border-2 border-bg-ink bg-white px-3 py-2 text-sm font-semibold text-bg-ink hover:bg-black/5"
             >
               <SkipForward size={15} />
               {dictionary.adminQueue.skipCta}

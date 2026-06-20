@@ -34,9 +34,9 @@ module.exports = {
         'danger-border': '#F0B8B8',
       },
       borderRadius: {
-        'card': '20px',
-        'card-lg': '28px',
-        'pill': '999px',
+        'card': '0px',
+        'card-lg': '0px',
+        'pill': '0px',
       },
       borderWidth: {
         '3': '3px',

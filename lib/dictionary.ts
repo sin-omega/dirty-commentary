@@ -136,6 +136,7 @@ export const dictionary = {
     channelVarHint: 'link z kontekstu zgłoszenia (jeśli podany)',
     textareaPlaceholder: 'napisz swój komentarz tutaj... użyj *bold*, _italic_, ~strike~',
     previewLabel: 'podgląd',
+    modeMarkdown: 'markdown',
     previewSignatureHint: 'podpis dodawany automatycznie z ustawień konta',
     settingsLinkCta: 'zmień w ustawieniach',
     missingChannelWarning: 'to zgłoszenie nie ma linku — %channel_link% zostanie puste',
